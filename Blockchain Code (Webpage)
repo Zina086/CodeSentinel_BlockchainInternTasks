@@ -1,0 +1,145 @@
+from flask import Flask, request, jsonify
+import time, hashlib
+
+
+
+class Block:
+    def __init__(self, index, timestamp, data, prev_hash):
+        self.index = index
+        self.timestamp = timestamp
+        self.data = data
+        self.prev_hash = prev_hash
+        self.hash = self.calc_hash()
+
+    def calc_hash(self):
+        sha = hashlib.sha256()
+        sha.update(str(self.index).encode('utf-8'))
+        sha.update(str(self.timestamp).encode('utf-8'))
+        sha.update(self.data.encode('utf-8'))
+        return sha.hexdigest()
+
+    def to_dict(self):
+        return {
+            "index": self.index,
+            "timestamp": self.timestamp,
+            "data": self.data,
+            "hash": self.hash,
+            "prev_hash": self.prev_hash
+        }
+
+class Blockchain:
+    def __init__(self):
+        self.chain = [self.create_genesis_block()]
+
+    def create_genesis_block(self):
+        return Block(0, time.time(), "Genesis Block", "0")
+
+    def add_block(self, data):
+        prev_block = self.chain[-1]
+        new_block = Block(len(self.chain), time.time(), data, prev_block.hash)
+        self.chain.append(new_block)
+        return new_block
+
+
+app = Flask(__name__)
+bc = Blockchain()
+
+@app.route("/chain", methods=["GET"])
+def get_chain():
+    return jsonify([b.to_dict() for b in bc.chain])
+
+@app.route("/add_block", methods=["POST"])
+def add_block():
+    data = request.json.get("data")
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    block = bc.add_block(data)
+    return jsonify(block.to_dict()), 201
+
+@app.route("/")
+def home():
+    return """
+    <html>
+    <head>
+        <title>Simple Blockchain</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: #f4f6f9;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+            }
+            .container {
+                text-align: center;
+                background: white;
+                padding: 30px;
+                border-radius: 15px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                width: 600px;
+            }
+            h1 {
+                color: #2c3e50;
+                margin-bottom: 20px;
+            }
+            button {
+                background: #3498db;
+                border: none;
+                color: white;
+                padding: 10px 20px;
+                margin: 10px;
+                border-radius: 8px;
+                font-size: 16px;
+                cursor: pointer;
+                transition: background 0.3s;
+            }
+            button:hover {
+                background: #2980b9;
+            }
+            pre {
+                text-align: left;
+                background: #2c3e50;
+                color: #ecf0f1;
+                padding: 15px;
+                border-radius: 10px;
+                max-height: 400px;
+                overflow-y: auto;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 Basic Blockchain</h1>
+            <button onclick="fetchChain()">View Blockchain</button>
+            <button onclick="addBlock()">Add Block</button>
+            <pre id="output">Click a button to get started...</pre>
+        </div>
+
+        <script>
+        async function fetchChain() {
+          let res = await fetch('/chain');
+          let data = await res.json();
+          document.getElementById('output').innerText = JSON.stringify(data, null, 2);
+        }
+        async function addBlock() {
+          let res = await fetch('/add_block', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({data: "Block added from browser"})
+          });
+          let block = await res.json();
+          document.getElementById('output').innerText = JSON.stringify(block, null, 2);
+        }
+        </script>
+    </body>
+    </html>
+    """
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5001)
+
