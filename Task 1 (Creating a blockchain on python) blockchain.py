@@ -44,3 +44,4 @@ for block in blockchain.chain:
     print("Hash:", block.hash)
     print("Previous Hash:", block.prev_hash)
     print()
+
